@@ -51,7 +51,8 @@ class Store<State : Any, Event : Any, UiEvent : Event, Command : Any, Effect : A
     override val state: StateFlow<State> = _state
 
     private val _effects: MutableSharedFlow<Effect> = MutableSharedFlow(extraBufferCapacity = Int.MAX_VALUE)
-    override val effects: SharedFlow<Effect> = _effects
+    private val effectsFlowSubscribeWaiter = Job()
+    override val effects: SharedFlow<Effect> = _effects.onSubscription { effectsFlowSubscribeWaiter.complete() }
 
     private val commands: MutableSharedFlow<Command> = MutableSharedFlow(extraBufferCapacity = Int.MAX_VALUE)
     private val events: MutableSharedFlow<Event> = MutableSharedFlow(extraBufferCapacity = Int.MAX_VALUE)
@@ -99,6 +100,7 @@ class Store<State : Any, Event : Any, UiEvent : Event, Command : Any, Effect : A
                 }
 
                 for (effect in next.effects) {
+                    effectsFlowSubscribeWaiter.join()
                     _effects.emit(effect)
                 }
             }
