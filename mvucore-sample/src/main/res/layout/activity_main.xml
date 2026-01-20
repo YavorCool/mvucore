@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/counterText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Count: 0"
+        android:textSize="32sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/decrementButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="-1" />
+
+        <Button
+            android:id="@+id/incrementButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="+1" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/asyncIncrementButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Async +1" />
+
+</LinearLayout>
