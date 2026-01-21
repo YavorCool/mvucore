@@ -22,6 +22,18 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".counter.view.CounterViewActivity"
+            android:exported="false"
+            android:label="Counter (View)"
+            android:theme="@style/Theme.MvuCore.NoActionBar" />
+
+        <activity
+            android:name=".counter.compose.CounterComposeActivity"
+            android:exported="false"
+            android:label="Counter (Compose)"
+            android:theme="@style/Theme.MvuCore.NoActionBar" />
+
     </application>
 
 </manifest>
