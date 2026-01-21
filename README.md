@@ -113,18 +113,15 @@ val counterUpdate = Update<CounterState, CounterEvent, CounterCommand, CounterEf
 
 ### 3. Create Command Handlers
 
-Command handlers execute side effects and emit events back to the store.
+Command handlers execute side effects and emit events back to the store. Use `FilteringHandler` to handle specific command types:
 
 ```kotlin
-class AsyncIncrementHandler : ICommandHandler<CounterCommand, CounterEvent> {
-    override fun handle(commands: Flow<CounterCommand>): Flow<CounterEvent> {
-        return commands
-            .filter { it is CounterCommand.LoadIncrement }
-            .map { command ->
-                val loadCommand = command as CounterCommand.LoadIncrement
-                delay(1000) // Simulate async operation
-                CounterEvent.AsyncIncrementResult(loadCommand.currentValue + 1)
-            }
+class LoadIncrementCommandHandler : FilteringHandler<CounterCommand.LoadIncrement, CounterCommand, CounterEvent>(
+    CounterCommand.LoadIncrement::class
+) {
+    override suspend fun handleCommand(command: CounterCommand.LoadIncrement): CounterEvent {
+        delay(1000) // Simulate async operation
+        return CounterEvent.AsyncIncrementResult(command.currentValue + 1)
     }
 }
 ```
@@ -132,43 +129,87 @@ class AsyncIncrementHandler : ICommandHandler<CounterCommand, CounterEvent> {
 ### 4. Create and use the Store
 
 ```kotlin
-// Create the store
 typealias CounterStore = IStore<CounterState, CounterEvent, CounterEffect>
 
-fun createCounterStore(): CounterStore = Store(
-    initialState = CounterState(),
-    update = counterUpdate,
-    commandHandlers = listOf(AsyncIncrementHandler())
-)
+// Create a ViewModel to survive configuration changes
+class CounterViewModel : ViewModel() {
+    val store: CounterStore = Store(
+        initialState = CounterState(),
+        update = counterUpdate,
+        commandHandlers = listOf(LoadIncrementCommandHandler())
+    )
 
-// In your Activity/Fragment
-class MainActivity : AppCompatActivity() {
-
-    // Wrap store with ViewModel to survive configuration changes
-    private val store: CounterStore by lazy {
-        wrapStoreWithViewModel { createCounterStore() }
+    init {
+        store.launch(viewModelScope)
     }
+}
+
+// In your Compose Activity
+class CounterComposeActivity : ComponentActivity() {
+
+    private val viewModel: CounterViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContent {
+            // Collect state as Compose state
+            val state by viewModel.store.state.collectAsStateWithLifecycle()
 
-        // Dispatch events
-        incrementButton.setOnClickListener { store.dispatch(CounterEvent.Increment) }
-
-        // Collect state
-        lifecycleScope.launch {
-            store.state.collect { state ->
-                counterText.text = "Count: ${state.count}"
-            }
-        }
-
-        // Collect effects
-        lifecycleScope.launch {
-            store.effects.collect { effect ->
+            // Handle one-time effects with lifecycle awareness
+            viewModel.store.effects.observeWithLifecycle { effect ->
                 when (effect) {
                     is CounterEffect.ShowMessage -> showToast(effect.message)
                 }
             }
+
+            CounterScreen(
+                state = state,
+                onIncrement = { viewModel.store.dispatch(CounterEvent.Increment) },
+                onDecrement = { viewModel.store.dispatch(CounterEvent.Decrement) },
+                onAsyncIncrement = { viewModel.store.dispatch(CounterEvent.AsyncIncrement) },
+            )
+        }
+    }
+}
+
+@Composable
+fun CounterScreen(
+    state: CounterState,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    onAsyncIncrement: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(text = "Count: ${state.count}")
+
+        Row {
+            Button(onClick = onDecrement) { Text("-1") }
+            Button(onClick = onIncrement) { Text("+1") }
+        }
+
+        Button(
+            onClick = onAsyncIncrement,
+            enabled = !state.isLoading,
+        ) {
+            Text(if (state.isLoading) "Loading..." else "Async +1")
+        }
+    }
+}
+
+// Helper extension for lifecycle-aware effect collection
+@Composable
+fun <T> Flow<T>.observeWithLifecycle(
+    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
+    minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
+    action: suspend (T) -> Unit,
+) {
+    LaunchedEffect(lifecycleOwner, minActiveState, action) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(minActiveState) {
+            collect(action)
         }
     }
 }
@@ -191,16 +232,15 @@ class MainActivity : AppCompatActivity() {
 |-------|-------------|
 | `Store` | Default implementation of `IStore` |
 | `Next` | Result of an update containing new state, commands, and effects |
-| `FilteringHandler` | Base class for command handlers that filter by command type |
-| `LatestFilteringHandler` | Handler that cancels previous operations when new commands arrive |
+| `FilteringHandler` | Base class for command handlers that filter by command type. Set `cancelPreviousOnNewCommand = true` to cancel previous operations when new commands arrive |
+| `FilteringHandlerToFlow` | Like `FilteringHandler`, but returns a `Flow<Event>` instead of a single event |
 
-### Lifecycle Extensions
+### Factory Functions
 
 | Function | Description |
 |----------|-------------|
-| `wrapStoreWithViewModel` | Wraps store in a ViewModel for lifecycle awareness |
-| `wrapStoreWithViewModelProperty` | Property delegate for lazy store initialization |
-| `IStore.collect` | Extension for collecting state and effects with lifecycle awareness |
+| `filteringHandler` | Creates a `FilteringHandler` inline with a lambda |
+| `filteringHandlerToFlow` | Creates a `FilteringHandlerToFlow` inline with a lambda |
 
 ## License
 
