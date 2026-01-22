@@ -52,7 +52,7 @@ Add the dependency to your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.yavorcool:mvucore:0.1.0")
+    implementation("com.github.yavorcool:mvucore:0.2.0")
 }
 ```
 
