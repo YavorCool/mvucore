@@ -1,12 +1,12 @@
 # MVU Core
 
-A lightweight Model-View-Update (MVU) architecture library for Android.
+A lightweight Model-View-Update (MVU) architecture library for Kotlin Multiplatform.
 
 [![](https://jitpack.io/v/yavorcool/mvucore.svg)](https://jitpack.io/#yavorcool/mvucore)
 
 ## Overview
 
-MVU Core provides a unidirectional data flow architecture inspired by The Elm Architecture. It helps you build predictable, testable, and maintainable Android applications.
+MVU Core provides a unidirectional data flow architecture inspired by The Elm Architecture. It helps you build predictable, testable, and maintainable applications with Kotlin Multiplatform (Android + iOS).
 
 ### How it works
 
@@ -35,6 +35,11 @@ MVU Core provides a unidirectional data flow architecture inspired by The Elm Ar
               Data (or events)┘   V Side effects
 ```
 
+## Supported Platforms
+
+- Android
+- iOS (arm64, simulatorArm64)
+
 ## Installation
 
 Add JitPack repository to your root `settings.gradle.kts`:
@@ -48,11 +53,15 @@ dependencyResolutionManagement {
 }
 ```
 
-Add the dependency to your module's `build.gradle.kts`:
+Add the dependency in your module's `build.gradle.kts`:
 
 ```kotlin
-dependencies {
-    implementation("com.github.yavorcool:mvucore:0.2.0")
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.github.yavorcool:mvucore:0.3.0")
+        }
+    }
 }
 ```
 
@@ -131,54 +140,36 @@ class LoadIncrementCommandHandler : FilteringHandler<CounterCommand.LoadIncremen
 ```kotlin
 typealias CounterStore = IStore<CounterState, CounterEvent, CounterEffect>
 
-// Create a ViewModel to survive configuration changes
-class CounterViewModel : ViewModel() {
-    val store: CounterStore = Store(
-        initialState = CounterState(),
-        update = counterUpdate,
-        commandHandlers = listOf(LoadIncrementCommandHandler())
-    )
+// Create a store and launch it in a CoroutineScope
+val store: CounterStore = Store(
+    initialState = CounterState(),
+    update = counterUpdate,
+    commandHandlers = listOf(LoadIncrementCommandHandler())
+)
+store.launch(coroutineScope)
 
-    init {
-        store.launch(viewModelScope)
+// Observe state
+store.state.collect { state -> /* update UI */ }
+
+// Observe one-time effects
+store.effects.collect { effect ->
+    when (effect) {
+        is CounterEffect.ShowMessage -> { /* show message */ }
     }
 }
 
-// In your Compose Activity
-class CounterComposeActivity : ComponentActivity() {
+// Dispatch events
+store.dispatch(CounterEvent.Increment)
+store.dispatch(CounterEvent.AsyncIncrement)
+```
 
-    private val viewModel: CounterViewModel by viewModels()
+### Compose Multiplatform example
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            // Collect state as Compose state
-            val state by viewModel.store.state.collectAsStateWithLifecycle()
-
-            // Handle one-time effects with lifecycle awareness
-            viewModel.store.effects.observeWithLifecycle { effect ->
-                when (effect) {
-                    is CounterEffect.ShowMessage -> showToast(effect.message)
-                }
-            }
-
-            CounterScreen(
-                state = state,
-                onIncrement = { viewModel.store.dispatch(CounterEvent.Increment) },
-                onDecrement = { viewModel.store.dispatch(CounterEvent.Decrement) },
-                onAsyncIncrement = { viewModel.store.dispatch(CounterEvent.AsyncIncrement) },
-            )
-        }
-    }
-}
-
+```kotlin
 @Composable
-fun CounterScreen(
-    state: CounterState,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-    onAsyncIncrement: () -> Unit,
-) {
+fun CounterScreen(store: CounterStore) {
+    val state by store.state.collectAsState()
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -187,29 +178,15 @@ fun CounterScreen(
         Text(text = "Count: ${state.count}")
 
         Row {
-            Button(onClick = onDecrement) { Text("-1") }
-            Button(onClick = onIncrement) { Text("+1") }
+            Button(onClick = { store.dispatch(CounterEvent.Decrement) }) { Text("-1") }
+            Button(onClick = { store.dispatch(CounterEvent.Increment) }) { Text("+1") }
         }
 
         Button(
-            onClick = onAsyncIncrement,
+            onClick = { store.dispatch(CounterEvent.AsyncIncrement) },
             enabled = !state.isLoading,
         ) {
             Text(if (state.isLoading) "Loading..." else "Async +1")
-        }
-    }
-}
-
-// Helper extension for lifecycle-aware effect collection
-@Composable
-fun <T> Flow<T>.observeWithLifecycle(
-    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
-    minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
-    action: suspend (T) -> Unit,
-) {
-    LaunchedEffect(lifecycleOwner, minActiveState, action) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(minActiveState) {
-            collect(action)
         }
     }
 }
@@ -242,10 +219,17 @@ fun <T> Flow<T>.observeWithLifecycle(
 | `filteringHandler` | Creates a `FilteringHandler` inline with a lambda |
 | `filteringHandlerToFlow` | Creates a `FilteringHandlerToFlow` inline with a lambda |
 
+### Android-only
+
+| Class | Description |
+|-------|-------------|
+| `RestorableState` | Interface for state persistence via `SavedStateHandle` (androidMain only) |
+| `restorableStore` | Factory function that creates a store with automatic state save/restore |
+
 ## License
 
 ```
-Copyright 2024 Nikita
+Copyright 2024-2026 Nikita
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
