@@ -1,11 +1,20 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.composeCompiler)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
+    }
 }
 
 android {
     namespace = "com.yavorcool.mvucore.sample"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.yavorcool.mvucore.sample"
@@ -30,14 +39,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
     buildFeatures {
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
     }
 }
 

@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "MvuCore"
 include(":mvucore-lib")
+include(":mvucore-sample")
