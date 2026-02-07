@@ -19,6 +19,7 @@ abstract class FilteringHandler<in FilteredCommand : Any, in ParentCommand : Any
     private val cancelPreviousOnNewCommand: Boolean = false,
 ) : ICommandHandler<ParentCommand, Event> {
     override fun handle(commands: Flow<ParentCommand>): Flow<Event> {
+        @Suppress("UNCHECKED_CAST")
         val filtered = commands.filter { commandClass.isInstance(it) } as Flow<FilteredCommand>
         return if (cancelPreviousOnNewCommand) {
             @OptIn(ExperimentalCoroutinesApi::class)
@@ -46,6 +47,7 @@ abstract class FilteringHandlerToFlow<in FilteredCommand : Any, in ParentCommand
 ) : ICommandHandler<ParentCommand, Event> {
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun handle(commands: Flow<ParentCommand>): Flow<Event> {
+        @Suppress("UNCHECKED_CAST")
         val filtered = commands.filter { commandClass.isInstance(it) } as Flow<FilteredCommand>
         return if (cancelPreviousOnNewCommand) {
             filtered.flatMapLatest(::handleCommand)

@@ -5,8 +5,6 @@ import com.yavorcool.mvucore.IStore
 import com.yavorcool.mvucore.Update
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 
 
 /**
@@ -57,14 +55,16 @@ class Store<State : Any, Event : Any, UiEvent : Event, Command : Any, Effect : A
     private val commands: MutableSharedFlow<Command> = MutableSharedFlow(extraBufferCapacity = Int.MAX_VALUE)
     private val events: MutableSharedFlow<Event> = MutableSharedFlow(extraBufferCapacity = Int.MAX_VALUE)
 
-    private val isLaunched = AtomicBoolean(false)
+    @OptIn(kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
+    private val isLaunched = kotlin.concurrent.atomics.AtomicInt(0)
 
     override fun dispatch(event: UiEvent) {
         if (!events.tryEmit(event)) error("Couldn't process $event, flow buffer overflow")
     }
 
     override fun launch(coroutineScope: CoroutineScope) {
-        if (isLaunched.getAndSet(true)) error("The store has been already launched")
+        @OptIn(kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
+        check(isLaunched.compareAndSet(expectedValue = 0, newValue = 1)) { "The store has been already launched" }
 
         val commandsFlowSubscribeWaiter = CountDownLatch(commandHandlers.size)
         val commandsFlow = commands.onSubscription {
@@ -81,7 +81,7 @@ class Store<State : Any, Event : Any, UiEvent : Event, Command : Any, Effect : A
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    throw CommandHandlerException(commandHandler::class.java, e)
+                    throw CommandHandlerException(commandHandler::class, e)
                 }
             }
         }
@@ -111,15 +111,14 @@ class Store<State : Any, Event : Any, UiEvent : Event, Command : Any, Effect : A
      * Analog of [java.util.concurrent.CountDownLatch] in coroutines world.
      */
     class CountDownLatch(count: Int) {
-        private val waitJob = Job()
-        private val counter = AtomicInteger(count)
+        private val remaining = MutableStateFlow(count)
 
         fun countDown() {
-            if (counter.decrementAndGet() == 0) {
-                waitJob.complete()
-            }
+            remaining.update { it - 1 }
         }
 
-        suspend fun await() = waitJob.join()
+        suspend fun await() {
+            remaining.first { it <= 0 }
+        }
     }
 }

@@ -9,4 +9,3 @@
 -keep class com.yavorcool.mvucore.Next { *; }
 -keep class com.yavorcool.mvucore.EventObserver { *; }
 -keep class com.yavorcool.mvucore.impl.Store { *; }
--keep class com.yavorcool.mvucore.lifecycle.** { *; }
